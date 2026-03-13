@@ -35,17 +35,13 @@ export default function App() {
   const [form, setForm]       = useState({ title:"", author:"", status:"want", rating:0, notes:"" });
 
   useEffect(() => {
-    (async () => {
-      try {
-        const r = await window.storage.get(KEY);
-        setBooks(r?.value ? JSON.parse(r.value) : SAMPLE);
-      } catch { setBooks(SAMPLE); }
-      setReady(true);
-    })();
+    const saved = localStorage.getItem(KEY);
+    setBooks(saved ? JSON.parse(saved) : SAMPLE);
+    setReady(true);
   }, []);
-
+  
   useEffect(() => {
-    if (ready) window.storage.set(KEY, JSON.stringify(books)).catch(()=>{});
+    if (ready) localStorage.setItem(KEY, JSON.stringify(books));
   }, [books, ready]);
 
   const add = () => {
