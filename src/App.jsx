@@ -9,49 +9,55 @@ const S_STYLES = {
 };
 
 const SAMPLE = [
-  { id: 1, title: "The Secret Garden",   author: "Frances H. Burnett",        status: "read",    rating: 5, isTop3: true  },
-  { id: 2, title: "A Room with a View",  author: "E.M. Forster",              status: "reading", rating: 4, isTop3: true  },
-  { id: 3, title: "The Little Prince",   author: "Antoine de Saint-Exupéry",  status: "want",    rating: 0, isTop3: true  },
-  { id: 4, title: "Stardust",            author: "Neil Gaiman",               status: "read",    rating: 4, isTop3: false },
+  { id: 1, title: "The Secret Garden",  author: "Frances H. Burnett",       status: "read",    rating: 5, isTop3: true,  notes: "Such a magical story about renewal and growth." },
+  { id: 2, title: "A Room with a View", author: "E.M. Forster",             status: "reading", rating: 4, isTop3: true,  notes: "Love the contrast between Italy and England." },
+  { id: 3, title: "The Little Prince",  author: "Antoine de Saint-Exupéry", status: "want",    rating: 0, isTop3: true,  notes: "" },
+  { id: 4, title: "Stardust",           author: "Neil Gaiman",              status: "read",    rating: 4, isTop3: false, notes: "Whimsical and adventurous — a perfect read." },
 ];
 
 const Stars = ({ rating, onChange }) => (
   <div style={{ display:"flex", gap:2, marginTop:3 }}>
     {[1,2,3,4,5].map(n => (
       <span key={n} onClick={() => onChange && onChange(n === rating ? 0 : n)}
-        style={{ cursor: onChange ? "pointer":"default", fontSize:15,
+        style={{ cursor: onChange?"pointer":"default", fontSize:15,
           color: n <= rating ? "#C9A84C" : "#d9c8ae" }}>★</span>
     ))}
   </div>
 );
 
 export default function App() {
-  const [books, setBooks]   = useState([]);
-  const [ready, setReady]   = useState(false);
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState("all");
+  const [books, setBooks]     = useState([]);
+  const [ready, setReady]     = useState(false);
+  const [search, setSearch]   = useState("");
+  const [filter, setFilter]   = useState("all");
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm]     = useState({ title:"", author:"", status:"want", rating:0 });
-  
-  useEffect(() => {
-  const saved = localStorage.getItem(KEY);
-  setBooks(saved ? JSON.parse(saved) : SAMPLE);
-  setReady(true);
-}, []);
+  const [expanded, setExpanded] = useState({});
+  const [form, setForm]       = useState({ title:"", author:"", status:"want", rating:0, notes:"" });
 
   useEffect(() => {
-  if (ready) localStorage.setItem(KEY, JSON.stringify(books));
+    (async () => {
+      try {
+        const r = await window.storage.get(KEY);
+        setBooks(r?.value ? JSON.parse(r.value) : SAMPLE);
+      } catch { setBooks(SAMPLE); }
+      setReady(true);
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (ready) window.storage.set(KEY, JSON.stringify(books)).catch(()=>{});
   }, [books, ready]);
 
   const add = () => {
     if (!form.title.trim()) return;
     setBooks(p => [{ ...form, id: Date.now(), isTop3: false }, ...p]);
-    setForm({ title:"", author:"", status:"want", rating:0 });
+    setForm({ title:"", author:"", status:"want", rating:0, notes:"" });
     setShowAdd(false);
   };
 
-  const del  = id => setBooks(p => p.filter(b => b.id !== id));
-  const upd  = (id, ch) => setBooks(p => p.map(b => b.id === id ? {...b,...ch} : b));
+  const del        = id => setBooks(p => p.filter(b => b.id !== id));
+  const upd        = (id, ch) => setBooks(p => p.map(b => b.id === id ? {...b,...ch} : b));
+  const toggleExp  = id => setExpanded(p => ({ ...p, [id]: !p[id] }));
 
   const toggleTop3 = id => {
     const b = books.find(b => b.id === id);
@@ -92,16 +98,22 @@ export default function App() {
         <div style={{ maxWidth:680, margin:"0 auto 28px", background:"#fdf6e3",
           borderRadius:18, padding:"18px 20px", boxShadow:"0 2px 14px rgba(107,58,42,.09)",
           border:"1px solid #e8d5b5" }}>
-          <h2 style={{ fontSize:14, color:"#8B5E3C", marginBottom:14,
-            fontStyle:"italic", margin:"0 0 14px" }}>⭐ My Top 3 Picks</h2>
+          <h2 style={{ fontSize:14, color:"#8B5E3C", margin:"0 0 14px", fontStyle:"italic" }}>
+            ⭐ My Top 3 Picks
+          </h2>
           <div style={{ display:"flex", gap:12, flexWrap:"wrap" }}>
             {top3.map(b => (
               <div key={b.id} style={{ flex:1, minWidth:150, background:"#fff8ee",
                 borderRadius:12, padding:"12px 14px", border:"1px solid #e0c9a6" }}>
-                <div style={{ fontWeight:"bold", fontSize:14, color:"#5c3317",
-                  lineHeight:1.3 }}>{b.title}</div>
+                <div style={{ fontWeight:"bold", fontSize:14, color:"#5c3317", lineHeight:1.3 }}>{b.title}</div>
                 <div style={{ fontSize:12, color:"#a0785a", marginTop:2 }}>{b.author}</div>
                 <Stars rating={b.rating} />
+                {b.notes && (
+                  <div style={{ marginTop:7, fontSize:12, color:"#7a5c40",
+                    fontStyle:"italic", lineHeight:1.5, borderTop:"1px solid #e8d5b5", paddingTop:7 }}>
+                    "{b.notes}"
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -150,73 +162,111 @@ export default function App() {
               <option value="reading">Reading</option>
               <option value="read">Read</option>
             </select>
-            <button onClick={add}
-              style={{ padding:"9px 20px", borderRadius:9, background:"#6b3a2a",
-                color:"#fff8ee", border:"none", cursor:"pointer", fontSize:14,
-                fontFamily:"Georgia,serif" }}>
-              Add
-            </button>
           </div>
-          <div style={{ marginTop:10, display:"flex", alignItems:"center", gap:8 }}>
+          <textarea placeholder="Notes (optional) — your thoughts, favorite quotes, reminders…"
+            value={form.notes} onChange={e => setForm(p=>({...p,notes:e.target.value}))}
+            rows={3}
+            style={{ marginTop:9, width:"100%", padding:"9px 12px", borderRadius:9,
+              border:"1px solid #d4b896", background:"#fff8ee", fontSize:13,
+              color:"#3d2b1f", fontFamily:"Georgia,serif", resize:"vertical",
+              boxSizing:"border-box", outline:"none" }} />
+          <div style={{ marginTop:10, display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
             <span style={{ fontSize:13, color:"#a0785a" }}>Rating:</span>
             <Stars rating={form.rating} onChange={r => setForm(p=>({...p,rating:r}))} />
+            <button onClick={add}
+              style={{ marginLeft:"auto", padding:"9px 20px", borderRadius:9,
+                background:"#6b3a2a", color:"#fff8ee", border:"none",
+                cursor:"pointer", fontSize:14, fontFamily:"Georgia,serif" }}>
+              Add
+            </button>
           </div>
         </div>
       )}
 
       {/* ── Book List ── */}
-      <div style={{ maxWidth:680, margin:"0 auto", display:"flex",
-        flexDirection:"column", gap:9 }}>
+      <div style={{ maxWidth:680, margin:"0 auto", display:"flex", flexDirection:"column", gap:9 }}>
         {list.length === 0 && (
-          <div style={{ textAlign:"center", padding:48, color:"#b09070",
-            fontStyle:"italic" }}>No books found… add one above!</div>
+          <div style={{ textAlign:"center", padding:48, color:"#b09070", fontStyle:"italic" }}>
+            No books found… add one above!
+          </div>
         )}
         {list.map(book => {
           const st = S_STYLES[book.status];
           const canPin = book.isTop3 || books.filter(b=>b.isTop3).length < 3;
+          const isOpen = expanded[book.id];
           return (
             <div key={book.id} style={{ background:"#fff8ee", borderRadius:14,
-              padding:"13px 16px", border:"1px solid #e0c9a6",
-              boxShadow:"0 1px 6px rgba(107,58,42,.06)",
-              display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+              border:"1px solid #e0c9a6", boxShadow:"0 1px 6px rgba(107,58,42,.06)",
+              overflow:"hidden" }}>
 
-              {/* pin */}
-              <button onClick={() => toggleTop3(book.id)}
-                title={book.isTop3 ? "Remove from Top 3" : canPin ? "Pin to Top 3" : "Top 3 full"}
-                style={{ background:"none", border:"none",
-                  cursor: canPin?"pointer":"not-allowed",
-                  fontSize:20, opacity: canPin?1:.35, padding:0, lineHeight:1 }}>
-                {book.isTop3 ? "🔖" : "🏷️"}
-              </button>
+              {/* Main row */}
+              <div style={{ padding:"13px 16px", display:"flex",
+                alignItems:"center", gap:12, flexWrap:"wrap" }}>
 
-              {/* info */}
-              <div style={{ flex:1, minWidth:120 }}>
-                <div style={{ fontWeight:"bold", fontSize:15,
-                  color:"#5c3317", lineHeight:1.3 }}>{book.title}</div>
-                {book.author && (
-                  <div style={{ fontSize:12, color:"#a0785a", marginTop:1 }}>
-                    {book.author}
+                {/* pin */}
+                <button onClick={() => toggleTop3(book.id)}
+                  title={book.isTop3 ? "Remove from Top 3" : canPin ? "Pin to Top 3" : "Top 3 full"}
+                  style={{ background:"none", border:"none", cursor: canPin?"pointer":"not-allowed",
+                    fontSize:20, opacity: canPin?1:.35, padding:0, lineHeight:1 }}>
+                  {book.isTop3 ? "🔖" : "🏷️"}
+                </button>
+
+                {/* info */}
+                <div style={{ flex:1, minWidth:120 }}>
+                  <div style={{ fontWeight:"bold", fontSize:15, color:"#5c3317", lineHeight:1.3 }}>
+                    {book.title}
                   </div>
-                )}
-                <Stars rating={book.rating} onChange={r => upd(book.id,{rating:r})} />
+                  {book.author && (
+                    <div style={{ fontSize:12, color:"#a0785a", marginTop:1 }}>{book.author}</div>
+                  )}
+                  <Stars rating={book.rating} onChange={r => upd(book.id,{rating:r})} />
+                </div>
+
+                {/* notes toggle */}
+                <button onClick={() => toggleExp(book.id)}
+                  title={isOpen ? "Hide notes" : "View / edit notes"}
+                  style={{ background: isOpen?"#f0e6d3":"none", border:"1px solid",
+                    borderColor: isOpen?"#d4b896":"transparent",
+                    borderRadius:8, cursor:"pointer", fontSize:13, padding:"4px 9px",
+                    color:"#8B5E3C", fontFamily:"Georgia,serif",
+                    transition:"all .15s" }}>
+                  {isOpen ? "✕ notes" : `📝 ${book.notes ? "notes" : "add note"}`}
+                </button>
+
+                {/* status */}
+                <select value={book.status}
+                  onChange={e => upd(book.id, { status: e.target.value })}
+                  style={{ padding:"5px 10px", borderRadius:20, border:"none",
+                    background: st.bg, color: st.color, fontSize:12, fontWeight:"bold",
+                    cursor:"pointer", fontFamily:"Georgia,serif" }}>
+                  <option value="read">Read</option>
+                  <option value="reading">Reading</option>
+                  <option value="want">Want to Read</option>
+                </select>
+
+                {/* delete */}
+                <button onClick={() => del(book.id)}
+                  style={{ background:"none", border:"none", cursor:"pointer",
+                    fontSize:20, color:"#c9a0a0", padding:0, lineHeight:1 }}
+                  title="Remove">×</button>
               </div>
 
-              {/* status */}
-              <select value={book.status}
-                onChange={e => upd(book.id, { status: e.target.value })}
-                style={{ padding:"5px 10px", borderRadius:20, border:"none",
-                  background: st.bg, color: st.color, fontSize:12, fontWeight:"bold",
-                  cursor:"pointer", fontFamily:"Georgia,serif" }}>
-                <option value="read">Read</option>
-                <option value="reading">Reading</option>
-                <option value="want">Want to Read</option>
-              </select>
-
-              {/* delete */}
-              <button onClick={() => del(book.id)}
-                style={{ background:"none", border:"none", cursor:"pointer",
-                  fontSize:20, color:"#c9a0a0", padding:0, lineHeight:1 }}
-                title="Remove">×</button>
+              {/* Notes panel */}
+              {isOpen && (
+                <div style={{ borderTop:"1px solid #ecdfc8", padding:"12px 16px",
+                  background:"#fdf8f0" }}>
+                  <textarea
+                    value={book.notes || ""}
+                    onChange={e => upd(book.id, { notes: e.target.value })}
+                    placeholder="Write your thoughts, favorite quotes, or reminders…"
+                    rows={3}
+                    style={{ width:"100%", padding:"9px 12px", borderRadius:9,
+                      border:"1px solid #d4b896", background:"#fff8ee",
+                      fontSize:13, color:"#3d2b1f", fontFamily:"Georgia,serif",
+                      resize:"vertical", boxSizing:"border-box", outline:"none",
+                      lineHeight:1.6 }} />
+                </div>
+              )}
             </div>
           );
         })}
@@ -225,7 +275,7 @@ export default function App() {
       {/* ── Footer ── */}
       <div style={{ textAlign:"center", marginTop:36, color:"#c4a882",
         fontSize:12, fontStyle:"italic" }}>
-        {books.length} book{books.length !== 1 ? "s" : ""} on your shelf
+        {books.length} book{books.length !== 1?"s":""} on your shelf
         &nbsp;·&nbsp;
         {books.filter(b=>b.status==="read").length} read
         &nbsp;·&nbsp;
